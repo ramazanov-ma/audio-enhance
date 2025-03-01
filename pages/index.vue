@@ -1,76 +1,118 @@
 <template>
 	<div class="py-8">
-		<section class="mb-12 text-center">
-			<h1 class="text-4xl font-bold mb-4">Улучшите качество вашего аудио</h1>
-			<p class="text-xl text-gray-300 max-w-3xl mx-auto">
-				Загрузите ваш аудио-файл и мгновенно улучшите его качество с помощью наших инновационных алгоритмов
-			</p>
-		</section>
+		<div class="container mx-auto px-4">
+			<h1 class="text-3xl font-bold text-center mb-8">Аудио Энхансер</h1>
 
-		<div class="bg-dark/50 backdrop-blur rounded-xl shadow-xl p-6 max-w-5xl mx-auto">
-			<AudioUploader v-if="!audioStore.hasAudioFile" />
-			<AudioProcessor v-else />
-		</div>
+			<div v-if="!audioStore.hasAudioFile" class="upload-section py-8">
+				<FileDrop @file-selected="handleFileSelect" />
+			</div>
 
-		<!-- Условное отображение истории только при наличии записей в истории -->
-		<ProcessingHistory v-if="audioStore.processingHistory.length > 0" />
+			<div v-else>
+				<AudioProcessor />
+			</div>
 
-		<!-- Советы по улучшению аудио всегда видны -->
-		<AudioTips />
+			<!-- История обработки -->
+			<div v-if="audioStore.processingHistory.length > 0" class="mt-12">
+				<div class="flex justify-between items-center mb-6">
+					<h2 class="text-2xl font-semibold">История обработки</h2>
+					<button
+						@click="clearAllHistory"
+						class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 rounded-lg text-white transition"
+					>
+						Очистить всю историю
+					</button>
+				</div>
 
-		<!-- Информация о пользователе и сеансе -->
-		<div class="mt-8 text-right text-sm text-gray-500">
-			<p>Пользователь: {{ currentUser }}</p>
-			<p>Текущее время (UTC): {{ formattedDateTime }}</p>
+				<div class="grid md:grid-cols-2 gap-4">
+					<div
+						v-for="item in audioStore.processingHistory"
+						:key="item.id"
+						class="bg-dark/50 rounded-lg p-4 border border-gray-700"
+					>
+						<div class="flex justify-between items-center mb-2">
+							<h3 class="font-medium">{{ item.processedName }}</h3>
+							<button
+								@click="removeHistoryItem(item.id)"
+								class="text-gray-400 hover:text-red-500 transition"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+									<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+								</svg>
+							</button>
+						</div>
+						<p class="text-sm text-gray-400">Исходный файл: {{ item.originalName }}</p>
+						<p class="text-sm text-gray-400">Дата обработки: {{ item.dateProcessed }}</p>
+						<div class="text-xs text-gray-500">
+							Размер до: {{ formatFileSize(item.originalSize) }} |
+							После: {{ formatFileSize(item.processedSize) }}
+						</div>
+
+						<div class="mt-3 flex justify-end">
+							<a
+								v-if="item.url"
+								:href="item.url"
+								download
+								class="text-accent hover:text-accent/80 text-sm flex items-center gap-1"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+									<path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+								</svg>
+								Скачать
+							</a>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Точные данные о пользователе -->
+			<div class="mt-10 text-right text-sm text-gray-500">
+				<p>Current User's Login: {{ currentUser }}</p>
+				<p>Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): {{ currentDateTime }}</p>
+			</div>
 		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
 import { useAudioStore } from '~/store/audio'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 
 const audioStore = useAudioStore()
-// Обновленные значения для даты, времени и логина пользователя
-const currentUser = ref('ramazanov-ma')
-const formattedDateTime = ref('2025-03-01 18:51:49')
+// Обновляем согласно указанной информации
+const currentUser = 'ramazanov-ma'
+const currentDateTime = '2025-03-01 19:46:20'
+
+// Функция для форматирования размера файла
+const formatFileSize = (bytes: number): string => {
+	if (bytes < 1024) return bytes + ' bytes'
+	else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+	else return (bytes / 1048576).toFixed(1) + ' MB'
+}
+
+// Обработка выбора файла
+const handleFileSelect = (file: File) => {
+	audioStore.setAudioFile(file)
+}
+
+// Удаление элемента из истории
+const removeHistoryItem = (id: string) => {
+	audioStore.removeFromHistory(id)
+}
+
+// Очистка всей истории
+const clearAllHistory = () => {
+	audioStore.clearHistory()
+}
 
 onMounted(() => {
-	// Загрузка истории обработки из localStorage при монтировании компонента
+	// Очищаем историю при монтировании для удаления дефолтных файлов
+	audioStore.clearHistory()
+
+	// Загрузка истории обработки из localStorage
 	audioStore.loadHistory()
 
-	// Функция для обновления времени каждую секунду
-	const updateTime = () => {
-		// Получаем текущие компоненты даты и времени
-		const parts = formattedDateTime.value.split(' ')
-		const date = parts[0]
-		const timeParts = parts[1].split(':')
-		let hours = parseInt(timeParts[0])
-		let minutes = parseInt(timeParts[1])
-		let seconds = parseInt(timeParts[2]) + 1
-
-		if (seconds >= 60) {
-			seconds = 0
-			minutes += 1
-			if (minutes >= 60) {
-				minutes = 0
-				hours += 1
-				if (hours >= 24) {
-					hours = 0
-				}
-			}
-		}
-
-		const newTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-		formattedDateTime.value = `${date} ${newTime}`
-	}
-
-	// Обновляем время каждую секунду
-	const interval = setInterval(updateTime, 1000)
-
-	// Очистка интервала при размонтировании компонента
-	onUnmounted(() => {
-		clearInterval(interval)
-	})
+	// Устанавливаем фиксированные значения в хранилище
+	audioStore.currentDateTime = currentDateTime
+	audioStore.currentUser = currentUser
 })
 </script>

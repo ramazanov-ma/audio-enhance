@@ -1,105 +1,49 @@
 <template>
-	<div class="py-8 max-w-4xl mx-auto">
+	<div class="py-8 max-w-4xl mx-auto px-4">
 		<h1 class="text-3xl font-bold mb-8">Настройки</h1>
 
 		<div class="bg-dark/50 backdrop-blur rounded-xl p-6 shadow-lg">
-			<h2 class="text-xl font-semibold mb-4">Параметры по умолчанию</h2>
-			<p class="text-gray-300 mb-6">
-				Установите параметры обработки аудио по умолчанию, которые будут применяться при загрузке новых файлов.
-			</p>
+			<h2 class="text-xl font-semibold mb-4">Настройки аудиообработки</h2>
 
-			<div class="grid md:grid-cols-2 gap-5">
+			<div class="space-y-6">
+				<!-- Настройки обработки по умолчанию -->
 				<div>
-					<label class="block mb-1 text-sm">Шумоподавление</label>
-					<input
-						type="range"
-						min="0"
-						max="100"
-						v-model.number="defaultSettings.noiseReduction"
-						class="w-full"
-					/>
-					<div class="flex justify-between text-xs text-gray-400">
-						<span>Мин</span>
-						<span>{{ defaultSettings.noiseReduction }}%</span>
-						<span>Макс</span>
+					<h3 class="font-medium mb-4">Настройки по умолчанию</h3>
+					<div class="grid md:grid-cols-2 gap-5">
+						<div class="slider-wrapper">
+							<label class="block mb-1 flex justify-between">
+								<span class="text-sm">Шумоподавление</span>
+								<span class="text-xs text-accent">{{ audioStore.settings.noiseReduction }}%</span>
+							</label>
+							<input
+								type="range"
+								min="0"
+								max="100"
+								v-model.number="audioStore.settings.noiseReduction"
+								class="w-full accent-slider"
+								@input="updateSliderBackground"
+							/>
+						</div>
+
+						<!-- Другие настройки по умолчанию -->
+					</div>
+
+					<div class="mt-4 flex gap-3 justify-end">
+						<button
+							@click="resetSettings"
+							class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm"
+						>
+							Сбросить
+						</button>
+
+						<button
+							@click="saveSettings"
+							class="px-4 py-2 bg-accent hover:bg-accent/80 rounded text-sm"
+						>
+							Сохранить настройки
+						</button>
 					</div>
 				</div>
-
-				<div>
-					<label class="block mb-1 text-sm">Нормализация</label>
-					<input
-						type="range"
-						min="0"
-						max="100"
-						v-model.number="defaultSettings.normalization"
-						class="w-full"
-					/>
-					<div class="flex justify-between text-xs text-gray-400">
-						<span>Мин</span>
-						<span>{{ defaultSettings.normalization }}%</span>
-						<span>Макс</span>
-					</div>
-				</div>
-			</div>
-
-			<div class="mt-8">
-				<h3 class="font-medium mb-3">Конфигурация эквалайзера</h3>
-				<div class="flex gap-4 flex-wrap">
-					<div class="flex flex-col items-center">
-						<span class="text-xs text-gray-400">Низкие</span>
-						<input
-							type="range"
-							min="-12"
-							max="12"
-							v-model.number="defaultSettings.equalizer.low"
-							class="h-24"
-							orient="vertical"
-						/>
-						<span class="text-xs">{{ defaultSettings.equalizer.low }}dB</span>
-					</div>
-
-					<div class="flex flex-col items-center">
-						<span class="text-xs text-gray-400">Средние</span>
-						<input
-							type="range"
-							min="-12"
-							max="12"
-							v-model.number="defaultSettings.equalizer.mid"
-							class="h-24"
-							orient="vertical"
-						/>
-						<span class="text-xs">{{ defaultSettings.equalizer.mid }}dB</span>
-					</div>
-
-					<div class="flex flex-col items-center">
-						<span class="text-xs text-gray-400">Высокие</span>
-						<input
-							type="range"
-							min="-12"
-							max="12"
-							v-model.number="defaultSettings.equalizer.high"
-							class="h-24"
-							orient="vertical"
-						/>
-						<span class="text-xs">{{ defaultSettings.equalizer.high }}dB</span>
-					</div>
-				</div>
-			</div>
-
-			<div class="flex justify-between mt-8">
-				<button
-					@click="resetToDefaults"
-					class="px-4 py-2 border border-gray-600 rounded-lg hover:bg-dark/80 transition"
-				>
-					Сбросить настройки
-				</button>
-
-				<button
-					@click="saveSettings"
-					class="px-6 py-2 bg-primary hover:bg-primary/80 rounded-lg font-medium transition-colors"
-				>
-					Сохранить настройки
-				</button>
 			</div>
 		</div>
 
@@ -133,83 +77,88 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { useAudioStore, type AudioSettings } from '~/store/audio'
+import { useAudioStore } from '~/store/audio'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const audioStore = useAudioStore()
 const currentUser = ref('ramazanov-ma')
-const formattedDateTime = ref('2025-03-01 18:51:49')
+const formattedDateTime = ref('2025-03-01 19:32:21')
 
-// Настройки по умолчанию
-const defaultSettings = reactive<AudioSettings>({
-	noiseReduction: 50,
-	normalization: 50,
-	equalizer: {
-		low: 0,
-		mid: 0,
-		high: 0
-	},
-	stereoEnhance: 0
-})
+// Функция для обновления фона ползунков
+const updateSliderBackground = (event) => {
+	const target = event.target
+	if (!target) return
 
-// Загрузка сохраненных настроек
-const loadSavedSettings = () => {
-	try {
-		const saved = localStorage.getItem('audioEnhancer_defaultSettings')
-		if (saved) {
-			const parsedSettings = JSON.parse(saved)
-			Object.assign(defaultSettings, parsedSettings)
-		}
-	} catch (e) {
-		console.error('Ошибка при загрузке настроек:', e)
-	}
+	const min = parseFloat(target.min) || 0
+	const max = parseFloat(target.max) || 100
+	const value = parseFloat(target.value)
+
+	const percentage = ((value - min) / (max - min)) * 100
+	target.style.backgroundImage = `linear-gradient(to right, #8B5CF6 0%, #8B5CF6 ${percentage}%, #374151 ${percentage}%, #374151 100%)`
 }
 
 // Сохранение настроек
 const saveSettings = () => {
-	try {
-		localStorage.setItem('audioEnhancer_defaultSettings', JSON.stringify(defaultSettings))
-		alert('Настройки успешно сохранены')
-
-		// Обновляем текущие настройки, если пользователь хочет их применить немедленно
-		if (confirm('Применить эти настройки к текущей сессии?')) {
-			audioStore.updateSettings(defaultSettings)
-		}
-	} catch (e) {
-		console.error('Ошибка при сохранении настроек:', e)
-		alert('Произошла ошибка при сохранении настроек')
-	}
+	audioStore.syncSettings()
+	alert('Настройки успешно сохранены')
 }
 
 // Сброс настроек
-const resetToDefaults = () => {
-	if (confirm('Вы уверены, что хотите сбросить все настройки к заводским значениям?')) {
-		defaultSettings.noiseReduction = 50
-		defaultSettings.normalization = 50
-		defaultSettings.equalizer.low = 0
-		defaultSettings.equalizer.mid = 0
-		defaultSettings.equalizer.high = 0
-		defaultSettings.stereoEnhance = 0
-
-		localStorage.removeItem('audioEnhancer_defaultSettings')
-		alert('Настройки сброшены к значениям по умолчанию')
+const resetSettings = () => {
+	if (confirm('Вы уверены, что хотите сбросить все настройки к значениям по умолчанию?')) {
+		audioStore.resetSettings()
 	}
 }
 
 // Очистка истории
 const clearHistory = () => {
-	if (confirm('Вы уверены, что хотите удалить всю историю обработки аудио?')) {
+	if (confirm('Вы уверены, что хотите очистить всю историю обработки?')) {
 		audioStore.clearHistory()
-		alert('История обработки очищена')
 	}
 }
 
 onMounted(() => {
-	loadSavedSettings()
+	// Загружаем сохраненные настройки
+	audioStore.loadSettings()
+
+	// Функция для обновления времени каждую секунду
+	const updateTime = () => {
+		// Получаем компоненты даты и времени
+		const parts = formattedDateTime.value.split(' ')
+		const date = parts[0]
+		const timeParts = parts[1].split(':')
+		let hours = parseInt(timeParts[0])
+		let minutes = parseInt(timeParts[1])
+		let seconds = parseInt(timeParts[2]) + 1
+
+		if (seconds >= 60) {
+			seconds = 0
+			minutes += 1
+			if (minutes >= 60) {
+				minutes = 0
+				hours += 1
+				if (hours >= 24) {
+					hours = 0
+				}
+			}
+		}
+
+		const newTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+		formattedDateTime.value = `${date} ${newTime}`
+	}
+
+	// Обновляем время каждую секунду
+	const interval = setInterval(updateTime, 1000)
+
+	// Очистка интервала при размонтировании компонента
+	onUnmounted(() => {
+		clearInterval(interval)
+	})
 })
 </script>
 
 <style scoped>
+/* Стилизация ползунков для консистентности с главной страницей */
 input[type="range"] {
 	-webkit-appearance: none;
 	appearance: none;
@@ -225,22 +174,21 @@ input[type="range"]::-webkit-slider-thumb {
 	width: 16px;
 	height: 16px;
 	border-radius: 50%;
-	background: #3B82F6;
+	background: #8B5CF6;
 	cursor: pointer;
+	border: 2px solid #1F2937;
+	box-shadow: 0 0 5px rgba(139, 92, 246, 0.3);
 }
 
-input[type="range"]::-moz-range-thumb {
-	width: 16px;
-	height: 16px;
-	border-radius: 50%;
-	background: #3B82F6;
-	cursor: pointer;
+.slider-wrapper {
+	position: relative;
+	padding: 8px;
+	border-radius: 8px;
+	background-color: rgba(31, 41, 55, 0.3);
+	border: 1px solid rgba(55, 65, 81, 0.5);
 }
 
-input[type="range"][orient="vertical"] {
-	writing-mode: bt-lr;
-	-webkit-appearance: slider-vertical;
-	width: 8px;
-	height: 100px;
+.accent-slider {
+	background: linear-gradient(to right, #8B5CF6 50%, #374151 50%);
 }
 </style>

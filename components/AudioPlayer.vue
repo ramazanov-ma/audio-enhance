@@ -1,48 +1,69 @@
 <template>
-	<div class="flex flex-col">
-		<div class="audio-wave-container relative h-36 bg-gray-800/50 rounded-lg overflow-hidden mb-2">
-			<AudioWaveform :audio-url="audioUrl" ref="waveformRef" />
-		</div>
-		<div class="flex items-center justify-center gap-4">
-			<button
-				@click="togglePlay"
-				class="p-3 rounded-full bg-accent hover:bg-accent/90 transition-colors shadow-lg flex items-center justify-center"
-			>
-				<svg v-if="isPlaying" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-				</svg>
-				<svg v-else xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-				</svg>
-			</button>
+	<div class="audio-player bg-dark/50 rounded-lg p-3 border border-gray-700">
+		<!-- Волновая дорожка на полную высоту -->
+		<div class="flex flex-col gap-2">
+			<div class="waveform-container relative" ref="waveformContainer">
+				<!-- Волновая дорожка (waveform) -->
+				<div class="absolute inset-0" ref="waveformElement"></div>
 
-			<div class="text-sm">
-				{{ currentTime }} / {{ duration }}
+				<!-- Прогресс бар -->
+				<div class="progress-overlay absolute top-0 left-0 h-full bg-accent/30 pointer-events-none" :style="{ width: `${progressPercentage}%` }"></div>
+
+				<!-- Область для клика -->
+				<div
+					class="absolute inset-0 cursor-pointer"
+					@click="seekTo"
+				></div>
 			</div>
 
-			<div class="volume-control flex items-center gap-2">
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M12 8c1.657 0 3 1.343 3 3s-1.343 3-3 3-3-1.343-3-3 1.343-3 3-3zm0 0V3" />
-				</svg>
-				<input
-					type="range"
-					min="0"
-					max="1"
-					step="0.01"
-					v-model.number="volume"
-					class="w-24"
-					@input="updateSliderBackground"
-					ref="volumeSlider"
-				/>
+			<!-- Контроллеры под волновой дорожкой -->
+			<div class="flex items-center justify-between">
+				<!-- Отображение времени слева -->
+				<div class="time-display text-xs text-gray-400">
+					<span>{{ formatTime(currentTime) }}</span>
+				</div>
+
+				<!-- Кнопка Play по центру -->
+				<button
+					@click="togglePlay"
+					class="play-btn h-10 w-10 bg-accent hover:bg-accent/80 rounded-full flex items-center justify-center transition-colors mx-auto"
+					:class="{ 'loading': loading }"
+				>
+					<span v-if="loading" class="loading-spinner"></span>
+					<svg v-else xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+						<path v-if="isPlaying" fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+						<path v-else fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+					</svg>
+				</button>
+
+				<!-- Управление громкостью и отображение полного времени справа -->
+				<div class="flex items-center gap-2">
+					<span class="text-xs text-gray-400">{{ formatTime(duration) }}</span>
+					<button @click="toggleMute" class="text-gray-400 hover:text-white transition ml-3">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+							<path v-if="isMuted" fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+							<path v-else-if="volume < 0.5" fill-rule="evenodd" d="M10 3.75a.75.75 0 00-1.264-.546L4.703 7H3.167a.75.75 0 00-.75.75v4.5c0 .414.336.75.75.75h1.536l4.033 3.796A.75.75 0 0010 16.25v-12.5zm2.792 5.744a.75.75 0 10-1.084 1.036 2.5 2.5 0 010 2.94.75.75 0 001.084 1.036 4 4 0 000-5.012z" />
+							<path v-else fill-rule="evenodd" d="M10 3.75a.75.75 0 00-1.264-.546L4.703 7H3.167a.75.75 0 00-.75.75v4.5c0 .414.336.75.75.75h1.536l4.033 3.796A.75.75 0 0010 16.25v-12.5zm2.792 5.744a.75.75 0 10-1.084 1.036 2.5 2.5 0 010 2.94.75.75 0 001.084 1.036 4 4 0 000-5.012z M14.523 8.7a.75.75 0 00-1.046 1.073 4.25 4.25 0 010 5.454.75.75 0 001.046 1.073 5.75 5.75 0 000-7.6z" />
+						</svg>
+					</button>
+
+					<input
+						type="range"
+						min="0"
+						max="1"
+						step="0.01"
+						v-model="volume"
+						class="volume-slider w-16"
+					/>
+				</div>
 			</div>
 		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, computed, onBeforeUnmount } from 'vue'
-import { useAudioPlayerManager } from '~/composables/useAudioPlayerManager'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
+import WaveSurfer from 'wavesurfer.js'
 
 const props = defineProps({
 	audioUrl: {
@@ -51,139 +72,224 @@ const props = defineProps({
 	}
 })
 
-// Уникальный ID для этого плеера
-const playerId = ref(`player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`)
-const waveformRef = ref(null)
+// Состояние плеера
+const audio = ref<HTMLAudioElement | null>(null)
+const wavesurfer = ref<WaveSurfer | null>(null)
 const isPlaying = ref(false)
+const loading = ref(true)
+const isMuted = ref(false)
 const volume = ref(0.8)
-const currentTimeSeconds = ref(0)
-const durationSeconds = ref(0)
-const volumeSlider = ref(null)
+const currentTime = ref(0)
+const duration = ref(0)
+const waveformContainer = ref(null)
+const waveformElement = ref(null)
 
-// Получение менеджера плееров
-const playerManager = useAudioPlayerManager()
+// Вычисляемые свойства
+const progressPercentage = computed(() => {
+	if (duration.value === 0) return 0
+	return (currentTime.value / duration.value) * 100
+})
 
-// Форматирование времени в мм:сс
+// Форматирование времени
 const formatTime = (seconds: number): string => {
-	seconds = Math.max(0, seconds || 0)
-	const mins = Math.floor(seconds / 60)
-	const secs = Math.floor(seconds % 60)
-	return `${mins}:${secs.toString().padStart(2, '0')}`
+	seconds = Math.floor(seconds)
+	const minutes = Math.floor(seconds / 60)
+	seconds = seconds % 60
+	return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
-const currentTime = computed(() => formatTime(currentTimeSeconds.value))
-const duration = computed(() => formatTime(durationSeconds.value))
+// Управление воспроизведением
+const togglePlay = () => {
+	if (!wavesurfer.value) return
 
-// Обновляем бэкграунд ползунка громкости
-const updateSliderBackground = (event) => {
-	const target = event.target || volumeSlider.value
-	if (!target) return
-
-	const min = target.min || 0
-	const max = target.max || 1
-	const value = target.value
-
-	const percentage = ((value - min) / (max - min)) * 100
-	target.style.backgroundImage = `linear-gradient(to right, #8B5CF6 0%, #8B5CF6 ${percentage}%, #374151 ${percentage}%, #374151 100%)`
-}
-
-// Пауза плеера (для вызова из менеджера плееров)
-const pausePlayer = () => {
-	if (isPlaying.value && waveformRef.value) {
-		waveformRef.value.pause()
-		isPlaying.value = false
-	}
-}
-
-const togglePlay = async () => {
-	if (!waveformRef.value) return
-
-	if (!isPlaying.value) {
-		// Активируем этот плеер в менеджере
-		playerManager.activatePlayer(playerId.value)
-
-		// Включаем воспроизведение
-		waveformRef.value.play()
-		isPlaying.value = true
+	if (isPlaying.value) {
+		wavesurfer.value.pause()
 	} else {
-		// Останавливаем воспроизведение
-		waveformRef.value.pause()
-		isPlaying.value = false
+		wavesurfer.value.play()
 	}
 }
 
-let timeUpdateInterval = null
+// Управление звуком
+const toggleMute = () => {
+	if (!wavesurfer.value) return
 
-onMounted(() => {
-	// Регистрируем плеер в менеджере
-	const unregister = playerManager.registerPlayer(playerId.value, pausePlayer)
+	isMuted.value = !isMuted.value
+	wavesurfer.value.setMuted(isMuted.value)
+}
 
-	// Обновляем стиль ползунка громкости
-	if (volumeSlider.value) {
-		updateSliderBackground({ target: volumeSlider.value })
+// Перемотка
+const seekTo = (event: MouseEvent) => {
+	if (!wavesurfer.value || !waveformContainer.value) return
+
+	const container = waveformContainer.value as HTMLDivElement
+	const rect = container.getBoundingClientRect()
+	const offsetX = event.clientX - rect.left
+	const percentage = offsetX / rect.width
+
+	wavesurfer.value.seekTo(percentage)
+}
+
+// Инициализация волновой дорожки
+const initWaveform = () => {
+	if (!waveformElement.value || !props.audioUrl) return
+
+	// Уничтожаем предыдущий экземпляр, если есть
+	if (wavesurfer.value) {
+		wavesurfer.value.destroy()
 	}
 
-	// Устанавливаем интервал для обновления текущего времени
-	timeUpdateInterval = setInterval(() => {
-		if (waveformRef.value && isPlaying.value) {
-			// Получаем текущее время из WaveSurfer
-			const waveSurfer = waveformRef.value.wavesurfer?.value
-			if (waveSurfer) {
-				currentTimeSeconds.value = waveSurfer.getCurrentTime()
-				durationSeconds.value = waveSurfer.getDuration() || 0
-			}
-		}
-	}, 250)
+	wavesurfer.value = WaveSurfer.create({
+		container: waveformElement.value,
+		waveColor: '#64748B',
+		progressColor: '#8B5CF6',
+		cursorColor: '#8B5CF6',
+		barWidth: 2,
+		barRadius: 2,
+		barGap: 1,
+		height: 90,  // Увеличиваем высоту волновой дорожки
+		responsive: true,
+		normalize: true,
+		partialRender: true,
+		fillParent: true
+	})
 
-	// Отменяем регистрацию при уничтожении компонента
-	onBeforeUnmount(() => {
-		unregister()
-		if (timeUpdateInterval) {
-			clearInterval(timeUpdateInterval)
-		}
+	// Загружаем аудио в wavesurfer
+	wavesurfer.value.load(props.audioUrl)
+
+	// События wavesurfer
+	wavesurfer.value.on('ready', () => {
+		loading.value = false
+		duration.value = wavesurfer.value?.getDuration() || 0
+		wavesurfer.value?.setVolume(volume.value)
+	})
+
+	wavesurfer.value.on('play', () => {
+		isPlaying.value = true
+	})
+
+	wavesurfer.value.on('pause', () => {
+		isPlaying.value = false
+	})
+
+	wavesurfer.value.on('finish', () => {
+		isPlaying.value = false
+	})
+
+	wavesurfer.value.on('audioprocess', (time) => {
+		currentTime.value = time
+	})
+
+	wavesurfer.value.on('error', (err) => {
+		loading.value = false
+		console.error('WaveSurfer error:', err)
+	})
+}
+
+// Применение изменения громкости
+watch(volume, (newVolume) => {
+	if (wavesurfer.value) {
+		wavesurfer.value.setVolume(newVolume)
+	}
+})
+
+// Обновление аудио при изменении URL
+watch(() => props.audioUrl, (newUrl) => {
+	if (!newUrl) return
+
+	loading.value = true
+	isPlaying.value = false
+	currentTime.value = 0
+	duration.value = 0
+
+	nextTick(() => {
+		initWaveform()
 	})
 })
 
-// Отслеживаем изменение громкости и обновляем у WaveSurfer
-watch(volume, (newVolume) => {
-	if (waveformRef.value?.wavesurfer?.value) {
-		waveformRef.value.wavesurfer.value.setVolume(newVolume)
-	}
+// Инициализация при монтировании компонента
+onMounted(() => {
+	// Инициализация waveform с небольшой задержкой
+	setTimeout(() => {
+		initWaveform()
+	}, 100)
 })
 
-// Обновляем плеер при изменении URL
-watch(() => props.audioUrl, () => {
-	isPlaying.value = false
-	currentTimeSeconds.value = 0
-	durationSeconds.value = 0
-}, { immediate: false })
+// Очистка ресурсов при размонтировании компонента
+onUnmounted(() => {
+	if (wavesurfer.value) {
+		wavesurfer.value.destroy()
+	}
+})
 </script>
 
 <style scoped>
-input[type="range"] {
-	-webkit-appearance: none;
-	appearance: none;
-	height: 6px;
-	border-radius: 3px;
-	background: #374151;
-	outline: none;
+.audio-player {
+	font-family: 'Inter', sans-serif;
 }
 
-input[type="range"]::-webkit-slider-thumb {
+.play-btn {
+	transition: transform 0.1s ease;
+}
+
+.play-btn:active {
+	transform: scale(0.95);
+}
+
+.volume-slider {
 	-webkit-appearance: none;
 	appearance: none;
-	width: 16px;
-	height: 16px;
+	height: 4px;
+	border-radius: 2px;
+	background: linear-gradient(to right, #8B5CF6 var(--volume-percentage, 80%), #4B5563 var(--volume-percentage, 80%));
+}
+
+.volume-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 12px;
+	height: 12px;
 	border-radius: 50%;
 	background: #8B5CF6;
 	cursor: pointer;
+	border: none;
 }
 
-input[type="range"]::-moz-range-thumb {
-	width: 16px;
-	height: 16px;
+.volume-slider::-moz-range-thumb {
+	width: 12px;
+	height: 12px;
 	border-radius: 50%;
 	background: #8B5CF6;
 	cursor: pointer;
+	border: none;
+}
+
+.waveform-container {
+	position: relative;
+	user-select: none;
+	border-radius: 8px;
+	overflow: hidden;
+	background-color: #1F2937;
+	padding: 12px;
+	height: 100px; /* Задаем фиксированную высоту контейнера */
+}
+
+/* Обеспечиваем, чтобы canvas занимал всю доступную высоту */
+.waveform-container wave {
+	height: 100% !important;
+}
+
+/* Анимация загрузки */
+.loading-spinner {
+	width: 16px;
+	height: 16px;
+	border: 2px solid rgba(255, 255, 255, 0.3);
+	border-radius: 50%;
+	border-top-color: #fff;
+	animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
 }
 </style>
