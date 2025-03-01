@@ -64,13 +64,20 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import WaveSurfer from 'wavesurfer.js'
+import { useAudioStore } from '~/store/audio'
 
 const props = defineProps({
 	audioUrl: {
 		type: String,
 		required: true
+	},
+	playerId: {
+		type: String,
+		required: true
 	}
 })
+
+const audioStore = useAudioStore()
 
 // Состояние плеера
 const audio = ref<HTMLAudioElement | null>(null)
@@ -98,14 +105,24 @@ const formatTime = (seconds: number): string => {
 	return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
-// Управление воспроизведением
+// Управление воспроизведением с поддержкой одиночного проигрывания
 const togglePlay = () => {
 	if (!wavesurfer.value) return
 
 	if (isPlaying.value) {
 		wavesurfer.value.pause()
+		audioStore.setCurrentPlaying(null)
 	} else {
+		// Если сейчас проигрывается другая дорожка, останавливаем ее
+		if (audioStore.currentPlayingId && audioStore.currentPlayingId !== props.playerId) {
+			// Событие для остановки предыдущего проигрывания
+			window.dispatchEvent(new CustomEvent('audio-stop', {
+				detail: { exceptId: props.playerId }
+			}))
+		}
+
 		wavesurfer.value.play()
+		audioStore.setCurrentPlaying(props.playerId)
 	}
 }
 
@@ -127,6 +144,14 @@ const seekTo = (event: MouseEvent) => {
 	const percentage = offsetX / rect.width
 
 	wavesurfer.value.seekTo(percentage)
+}
+
+// Остановка проигрывания в ответ на внешнее событие
+const handleExternalStopEvent = (event: CustomEvent) => {
+	if (event.detail?.exceptId === props.playerId) return
+	if (wavesurfer.value && isPlaying.value) {
+		wavesurfer.value.pause()
+	}
 }
 
 // Инициализация волновой дорожки
@@ -173,6 +198,7 @@ const initWaveform = () => {
 
 	wavesurfer.value.on('finish', () => {
 		isPlaying.value = false
+		audioStore.setCurrentPlaying(null)
 	})
 
 	wavesurfer.value.on('audioprocess', (time) => {
@@ -206,8 +232,21 @@ watch(() => props.audioUrl, (newUrl) => {
 	})
 })
 
+// Отслеживание изменений в хранилище для синхронизации состояния
+watch(() => audioStore.currentPlayingId, (newId) => {
+	// Если текущий плеер перестал быть активным - остановим его
+	if (isPlaying.value && newId !== props.playerId) {
+		if (wavesurfer.value) {
+			wavesurfer.value.pause()
+		}
+	}
+})
+
 // Инициализация при монтировании компонента
 onMounted(() => {
+	// Добавляем слушатель события для остановки проигрывания
+	window.addEventListener('audio-stop', handleExternalStopEvent as EventListener)
+
 	// Инициализация waveform с небольшой задержкой
 	setTimeout(() => {
 		initWaveform()
@@ -216,8 +255,18 @@ onMounted(() => {
 
 // Очистка ресурсов при размонтировании компонента
 onUnmounted(() => {
+	// Если этот плеер был активным, очищаем состояние
+	if (audioStore.currentPlayingId === props.playerId) {
+		audioStore.setCurrentPlaying(null)
+	}
+
+	// Удаляем слушатель события
+	window.removeEventListener('audio-stop', handleExternalStopEvent as EventListener)
+
+	// Уничтожаем wavesurfer
 	if (wavesurfer.value) {
 		wavesurfer.value.destroy()
+		wavesurfer.value = null
 	}
 })
 </script>

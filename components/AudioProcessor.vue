@@ -15,7 +15,7 @@
 		<!-- Используем только AudioPlayer для воспроизведения -->
 		<div>
 			<h3 class="text-lg font-medium mb-2">Предварительное прослушивание</h3>
-			<AudioPlayer :audio-url="audioStore.originalAudioUrl" />
+			<AudioPlayer :audio-url="audioStore.originalAudioUrl" player-id="original-audio" />
 		</div>
 
 		<!-- Все настройки теперь располагаются на одном уровне -->
@@ -253,12 +253,12 @@
 			<div class="grid md:grid-cols-2 gap-6">
 				<div>
 					<h4 class="text-sm font-medium mb-2">Исходный аудиофайл</h4>
-					<AudioPlayer :audio-url="audioStore.originalAudioUrl" />
+					<AudioPlayer :audio-url="audioStore.originalAudioUrl" player-id="result-original" />
 				</div>
 
 				<div>
 					<h4 class="text-sm font-medium mb-2">Улучшенный аудиофайл</h4>
-					<AudioPlayer :audio-url="audioStore.processedAudioUrl" />
+					<AudioPlayer :audio-url="audioStore.processedAudioUrl" player-id="result-processed" />
 				</div>
 			</div>
 

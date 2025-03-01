@@ -42,6 +42,7 @@ export interface AudioState {
     processingHistory: ProcessedAudio[]
     currentUser: string
     currentDateTime: string
+    currentPlayingId: string | null
 }
 
 export const useAudioStore = defineStore('audio', {
@@ -63,7 +64,8 @@ export const useAudioStore = defineStore('audio', {
         advancedSettings: null,
         processingHistory: [],
         currentUser: 'ramazanov-ma',
-        currentDateTime: '2025-03-01 19:21:42'
+        currentDateTime: '2025-03-01 19:49:40',
+        currentPlayingId: null
     }),
 
     getters: {
@@ -279,6 +281,22 @@ export const useAudioStore = defineStore('audio', {
             localStorage.removeItem('audioEnhancer_advancedSettings')
 
             console.log(`[${this.currentDateTime}] ${this.currentUser}: Настройки сброшены к значениям по умолчанию`)
+        },
+
+        // Метод для управления воспроизведением
+        setCurrentPlaying(id: string | null) {
+            this.currentPlayingId = id
+            console.log(`[${this.currentDateTime}] ${this.currentUser}: Установлен аудио-плеер: ${id || 'none'}`)
+        },
+
+        // Получить текущий проигрываемый ID
+        getCurrentPlayingId() {
+            return this.currentPlayingId
+        },
+
+        // Проверка, проигрывается ли конкретный аудио файл
+        isCurrentlyPlaying(id: string) {
+            return this.currentPlayingId === id
         }
     }
 })
