@@ -186,6 +186,31 @@ const initWaveform = () => {
 		loading.value = false
 		duration.value = wavesurfer.value?.getDuration() || 0
 		wavesurfer.value?.setVolume(volume.value)
+
+		// Проверка на пустую дорожку
+		const audioData = wavesurfer.value.getDecodedData()
+		let maxValue = 0;
+
+		if (audioData) {
+			for (let channel = 0; channel < audioData.numberOfChannels; channel++) {
+				const channelData = audioData.getChannelData(channel)
+				for (let i = 0; i < Math.min(10000, channelData.length); i++) {
+					maxValue = Math.max(maxValue, Math.abs(channelData[i]))
+				}
+			}
+
+			console.log(`[${props.playerId}] Max audio value: ${maxValue}`)
+
+			// Если значения слишком малы, масштабируем их для отображения
+			if (maxValue > 0 && maxValue < 0.01) {
+				wavesurfer.value.setOptions({
+					normalize: true,
+					waveColor: '#64748B',
+					progressColor: '#8B5CF6'
+				})
+				console.log(`[${props.playerId}] Normalizing waveform display due to low amplitude`)
+			}
+		}
 	})
 
 	wavesurfer.value.on('play', () => {
