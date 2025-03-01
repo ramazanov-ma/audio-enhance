@@ -28,7 +28,7 @@ export interface ProcessedAudio {
     originalSize: number
     processedSize: number
     processingParams: AudioSettings
-    advancedParams?: AdvancedSettings
+    advancedParams: AdvancedSettings | undefined
     url: string
 }
 
@@ -64,29 +64,28 @@ export const useAudioStore = defineStore('audio', {
         advancedSettings: null,
         processingHistory: [],
         currentUser: 'ramazanov-ma',
-        currentDateTime: '2025-03-01 19:49:40',
+        currentDateTime: '2025-03-01 20:13:07',
         currentPlayingId: null
     }),
 
     getters: {
         hasAudioFile: (state) => !!state.audioFile,
-        hasProcessedAudio: (state) => !!state.processedAudioUrl
+        hasProcessedAudio: (state) => !!state.processedAudioUrl,
     },
 
     actions: {
         setAudioFile(file: File) {
+            this.audioFile = file
             if (this.originalAudioUrl) {
                 URL.revokeObjectURL(this.originalAudioUrl)
             }
-            if (this.processedAudioUrl) {
-                URL.revokeObjectURL(this.processedAudioUrl)
-                this.processedAudioUrl = null
-            }
-
-            this.audioFile = file
             this.originalAudioUrl = URL.createObjectURL(file)
+            this.processedAudioUrl = null
+        },
 
-            console.log(`[${this.currentDateTime}] ${this.currentUser}: Аудиофайл загружен: ${file.name}`)
+        addToHistory(item: ProcessedAudio) {
+            this.processingHistory.unshift(item)
+            this.saveHistory()
         },
 
         updateSettings(settings: Partial<AudioSettings>) {
@@ -155,70 +154,31 @@ export const useAudioStore = defineStore('audio', {
 
         saveHistory() {
             try {
-                localStorage.setItem('audioEnhancer_history', JSON.stringify(this.processingHistory))
-                console.log(`[${this.currentDateTime}] ${this.currentUser}: История сохранена в localStorage`)
-            } catch (e) {
-                console.error(`[${this.currentDateTime}] ${this.currentUser}: Ошибка при сохранении истории:`, e)
+                localStorage.setItem('audioProcessingHistory', JSON.stringify(this.processingHistory))
+            } catch (error) {
+                console.error(`[${this.currentDateTime}] ${this.currentUser}: Error saving history:`, error)
             }
         },
 
         loadHistory() {
             try {
-                const history = localStorage.getItem('audioEnhancer_history')
+                const history = localStorage.getItem('audioProcessingHistory')
                 if (history) {
-                    const parsedHistory = JSON.parse(history)
-
-                    // Фиксируем ошибку типизации, явно указывая тип для item
-                    this.processingHistory = parsedHistory.map((item: ProcessedAudio) => {
-                        // Если URL не валиден, можно предоставить заглушку или null
-                        return {
-                            ...item,
-                            url: item.url || null
-                        }
-                    })
-
-                    console.log(`[${this.currentDateTime}] ${this.currentUser}: История загружена из localStorage, ${this.processingHistory.length} записей`)
+                    this.processingHistory = JSON.parse(history)
                 }
-            } catch (e) {
-                console.error(`[${this.currentDateTime}] ${this.currentUser}: Ошибка при загрузке истории:`, e)
+            } catch (error) {
+                console.error(`[${this.currentDateTime}] ${this.currentUser}: Error loading history:`, error)
             }
         },
 
         removeFromHistory(id: string) {
-            const index = this.processingHistory.findIndex(item => item.id === id)
-            if (index !== -1) {
-                // Если URL существует и не используется в текущем обработанном аудио,
-                // освобождаем его
-                const item = this.processingHistory[index]
-                if (item.url && item.url !== this.processedAudioUrl) {
-                    try {
-                        URL.revokeObjectURL(item.url)
-                    } catch (e) {
-                        console.warn(`[${this.currentDateTime}] ${this.currentUser}: Не удалось освободить URL:`, e)
-                    }
-                }
-
-                this.processingHistory.splice(index, 1)
-                this.saveHistory()
-                console.log(`[${this.currentDateTime}] ${this.currentUser}: Элемент удален из истории: ${id}`)
-            }
+            this.processingHistory = this.processingHistory.filter(item => item.id !== id)
+            this.saveHistory()
         },
 
         clearHistory() {
-            // Освобождаем все URL-ы истории, кроме текущего обработанного аудио
-            this.processingHistory.forEach(item => {
-                if (item.url && item.url !== this.processedAudioUrl) {
-                    try {
-                        URL.revokeObjectURL(item.url)
-                    } catch (e) {
-                        console.warn(`[${this.currentDateTime}] ${this.currentUser}: Не удалось освободить URL:`, e)
-                    }
-                }
-            })
-
             this.processingHistory = []
             this.saveHistory()
-            console.log(`[${this.currentDateTime}] ${this.currentUser}: История обработки очищена`)
         },
 
         updateCurrentDateTime(dateTime: string) {
@@ -286,7 +246,6 @@ export const useAudioStore = defineStore('audio', {
         // Метод для управления воспроизведением
         setCurrentPlaying(id: string | null) {
             this.currentPlayingId = id
-            console.log(`[${this.currentDateTime}] ${this.currentUser}: Установлен аудио-плеер: ${id || 'none'}`)
         },
 
         // Получить текущий проигрываемый ID

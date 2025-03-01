@@ -649,7 +649,6 @@ input[type="range"]::-moz-range-thumb {
 
 input[type="range"][orient="vertical"] {
 	writing-mode: bt-lr;
-	-webkit-appearance: slider-vertical;
 	width: 8px;
 	height: 100px;
 }
