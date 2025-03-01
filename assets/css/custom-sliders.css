@@ -1,0 +1,49 @@
+/* Стили для ползунков с цветным прогрессом */
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: #374151;
+    outline: none;
+    background-image: linear-gradient(to right, #8B5CF6 0%, #8B5CF6 50%, #374151 50%, #374151 100%);
+    background-size: 200% 100%;
+    background-position: right bottom;
+    transition: background-position 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #8B5CF6;
+    cursor: pointer;
+    border: 2px solid #F9FAFB;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #8B5CF6;
+    cursor: pointer;
+    border: 2px solid #F9FAFB;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"][orient="vertical"] {
+    writing-mode: bt-lr;
+    -webkit-appearance: slider-vertical;
+    width: 8px;
+    height: 100px;
+    background-image: linear-gradient(to top, #8B5CF6 0%, #8B5CF6 50%, #374151 50%, #374151 100%);
+}
+
+/* Обновить прогресс при перемещении ползунка */
+.slider-wrapper {
+    position: relative;
+    width: 100%;
+}
