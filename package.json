@@ -12,15 +12,13 @@
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@nuxtjs/tailwindcss": "^6.13.1",
     "@pinia/nuxt": "^0.10.1",
+    "@tensorflow/tfjs": "^4.22.0",
     "nuxt": "^3.15.4",
-    "tunajs": "^1.0.15",
     "vue": "latest",
     "vue-router": "latest",
     "wavesurfer.js": "^7.9.1"
-  },
-  "devDependencies": {
-    "@types/tunajs": "^1.0.3"
   }
 }
