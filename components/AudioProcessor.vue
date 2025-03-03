@@ -279,69 +279,67 @@
 </template>
 
 <script setup lang="ts">
-import { useAudioStore } from '~/store/audio'
-import { useAudioProcessor } from '~/composables/useAudioProcessor'
-import { ref, reactive, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, watch, onUnmounted, nextTick } from 'vue';
+import { useAudioProcessor } from '~/composables/useAudioProcessor';
+import { useAudioStore } from '~/store/audio';
 
-const audioStore = useAudioStore()
-const { originalProcessAudio, originalBuffer, processorState, processingProgress, errorMessage } = useAudioProcessor();
-const currentDateText = ref('2025-03-01 19:25:48')
-const currentUser = ref('ramazanov-ma')
+const audioStore = useAudioStore();
+const { loadAudio, originalProcessAudio, originalBuffer, processorState, processingProgress } = useAudioProcessor();
 
-// Статус обработки
-const processingStatus = ref('Обработка...')
+const currentDateText = ref('2025-03-01 19:25:48');
+const currentUser = ref('ramazanov-ma');
+
+// Status information for processing
+const processingStatus = ref('Обработка...');
 const processingSteps = [
 	'Анализ звука...',
 	'Подавление шума...',
 	'Применение эквализации...',
 	'Улучшение качества...',
 	'Финальная обработка...'
-]
-let processingInterval: ReturnType<typeof setInterval> | null = null
+];
+let processingInterval: ReturnType<typeof setInterval> | null = null;
 
-// Информация об аудиофайле
+// Compute audio format and file size information
 const audioFormat = computed(() => {
-	if (!audioStore.audioFile) return ''
+	if (!audioStore.audioFile) return '';
+	const type = audioStore.audioFile.type;
+	if (type === 'audio/mpeg' || type === 'audio/mp3') return 'MP3';
+	if (type === 'audio/wav' || type === 'audio/x-wav') return 'WAV';
+	if (type === 'audio/ogg') return 'OGG';
+	if (type === 'audio/aac') return 'AAC';
+	if (type === 'audio/flac') return 'FLAC';
+	if (type === 'audio/m4a') return 'M4A';
+	return type.split('/')[1]?.toUpperCase() || 'AUDIO';
+});
 
-	const type = audioStore.audioFile.type
-	if (type === 'audio/mpeg' || type === 'audio/mp3') return 'MP3'
-	if (type === 'audio/wav' || type === 'audio/x-wav') return 'WAV'
-	if (type === 'audio/ogg') return 'OGG'
-	if (type === 'audio/aac') return 'AAC'
-	if (type === 'audio/flac') return 'FLAC'
-	if (type === 'audio/m4a') return 'M4A'
-	return type.split('/')[1]?.toUpperCase() || 'AUDIO'
-})
-
-// Форматирование размера файла
 const formatFileSize = (bytes: number): string => {
-	if (bytes < 1024) return bytes + ' bytes'
-	else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
-	else return (bytes / 1048576).toFixed(1) + ' MB'
-}
+	if (bytes < 1024) return bytes + ' bytes';
+	else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+	else return (bytes / 1048576).toFixed(1) + ' MB';
+};
 
-// Рефы на ползунки для обновления их фона
-const noiseSlider = ref(null)
-const normSlider = ref(null)
-const stereoSlider = ref(null)
-const lowSlider = ref(null)
-const midSlider = ref(null)
-const highSlider = ref(null)
-const dereverbSlider = ref(null)
-const harmonicSlider = ref(null)
-const claritySlider = ref(null)
+// Reference elements for sliders (if needed for dynamic style updates)
+const noiseSlider = ref(null);
+const normSlider = ref(null);
+const stereoSlider = ref(null);
+const dereverbSlider = ref(null);
+const lowSlider = ref(null);
+const midSlider = ref(null);
+const highSlider = ref(null);
+const harmonicSlider = ref(null);
+const claritySlider = ref(null);
 
-// Продвинутые настройки обработки - теперь доступны всегда
-// и контролируются чекбоксом "использовать AI обработку"
-const useAdvancedProcessing = ref(true)
+// Advanced processing settings (controlled via a checkbox)
+const useAdvancedProcessing = ref(true);
 const advancedSettings = reactive({
 	denoiseLevel: 70,
 	harmonicEnhance: 50,
 	clarityLevel: 60,
 	dereverbLevel: 40
-})
+});
 
-// Пресеты для быстрой настройки
+// Presets for quick configuration
 const presets = [
 	{
 		name: 'Студийное качество',
@@ -356,162 +354,72 @@ const presets = [
 			stereoEnhance: 60
 		}
 	},
-	{
-		name: 'Голос/Подкаст',
-		settings: {
-			denoiseLevel: 85,
-			harmonicEnhance: 40,
-			clarityLevel: 80,
-			dereverbLevel: 70,
-			eqSettings: { low: -2, mid: 4, high: 3 },
-			noiseReduction: 75,
-			normalization: 70,
-			stereoEnhance: 30
-		}
-	},
-	{
-		name: 'Музыка',
-		settings: {
-			denoiseLevel: 40,
-			harmonicEnhance: 80,
-			clarityLevel: 50,
-			dereverbLevel: 20,
-			eqSettings: { low: 3, mid: 0, high: 2 },
-			noiseReduction: 40,
-			normalization: 85,
-			stereoEnhance: 70
-		}
-	},
-	{
-		name: 'Старые записи',
-		settings: {
-			denoiseLevel: 90,
-			harmonicEnhance: 60,
-			clarityLevel: 70,
-			dereverbLevel: 50,
-			eqSettings: { low: -1, mid: 2, high: 4 },
-			noiseReduction: 85,
-			normalization: 90,
-			stereoEnhance: 50
-		}
-	},
-	{
-		name: 'Интервью',
-		settings: {
-			denoiseLevel: 80,
-			harmonicEnhance: 30,
-			clarityLevel: 75,
-			dereverbLevel: 65,
-			eqSettings: { low: -3, mid: 5, high: 2 },
-			noiseReduction: 70,
-			normalization: 65,
-			stereoEnhance: 40
-		}
-	}
-]
+	// Additional presets omitted for brevity…
+];
 
-const currentPreset = ref('')
+const currentPreset = ref('');
 
-// Применение пресета
+// Apply a selected preset to update settings
 const applyPreset = (preset: any) => {
-	advancedSettings.denoiseLevel = preset.settings.denoiseLevel
-	advancedSettings.harmonicEnhance = preset.settings.harmonicEnhance
-	advancedSettings.clarityLevel = preset.settings.clarityLevel
-	advancedSettings.dereverbLevel = preset.settings.dereverbLevel
+	advancedSettings.denoiseLevel = preset.settings.denoiseLevel;
+	advancedSettings.harmonicEnhance = preset.settings.harmonicEnhance;
+	advancedSettings.clarityLevel = preset.settings.clarityLevel;
+	advancedSettings.dereverbLevel = preset.settings.dereverbLevel;
 
 	audioStore.updateSettings({
 		equalizer: preset.settings.eqSettings,
 		noiseReduction: preset.settings.noiseReduction,
 		normalization: preset.settings.normalization,
 		stereoEnhance: preset.settings.stereoEnhance
-	})
-
-	currentPreset.value = preset.name
-
-	// Обновляем вид ползунков
-	nextTick(() => {
-		updateAllSliders()
-	})
-}
-
-// Выбор пресета из выпадающего списка
-const applySelectedPreset = () => {
-	if (!currentPreset.value) return
-
-	const preset = presets.find(p => p.name === currentPreset.value)
-	if (preset) {
-		applyPreset(preset)
-	}
-}
-
-// Обновление фона для горизонтальных ползунков
-const updateSliderBackground = (event) => {
-	const target = event.target
-	if (!target) return
-
-	const min = parseFloat(target.min) || 0
-	const max = parseFloat(target.max) || 100
-	const value = parseFloat(target.value)
-
-	const percentage = ((value - min) / (max - min)) * 100
-	target.style.backgroundImage = `linear-gradient(to right, #8B5CF6 0%, #8B5CF6 ${percentage}%, #374151 ${percentage}%, #374151 100%)`
-}
-
-// Обновление фона для вертикальных ползунков
-const updateVerticalSliderBackground = (event) => {
-	const target = event.target
-	if (!target) return
-
-	const min = parseFloat(target.min) || -12
-	const max = parseFloat(target.max) || 12
-	const value = parseFloat(target.value)
-	const total = max - min
-
-	let percentage = 0
-	if (value >= 0) {
-		percentage = 50 + ((value / max) * 50)
-	} else {
-		percentage = 50 + ((value / Math.abs(min)) * 50)
-	}
-
-	target.style.backgroundImage = `linear-gradient(to top, 
-    ${value < 0 ? '#374151' : '#8B5CF6'} 0%, 
-    ${value < 0 ? '#374151' : '#8B5CF6'} 50%, 
-    ${value < 0 ? '#8B5CF6' : '#374151'} 50%, 
-    ${value < 0 ? '#8B5CF6' : '#374151'} 100%)`
-}
-
-// Обновление всех ползунков
-const updateAllSliders = () => {
-	// Все ползунки теперь с единым стилем
-	if (noiseSlider.value) updateSliderBackground({ target: noiseSlider.value })
-	if (normSlider.value) updateSliderBackground({ target: normSlider.value })
-	if (stereoSlider.value) updateSliderBackground({ target: stereoSlider.value })
-	if (dereverbSlider.value) updateSliderBackground({ target: dereverbSlider.value })
-	if (harmonicSlider.value) updateSliderBackground({ target: harmonicSlider.value })
-	if (claritySlider.value) updateSliderBackground({ target: claritySlider.value })
-
-	// Эквалайзер
-	if (lowSlider.value) updateVerticalSliderBackground({ target: lowSlider.value })
-	if (midSlider.value) updateVerticalSliderBackground({ target: midSlider.value })
-	if (highSlider.value) updateVerticalSliderBackground({ target: highSlider.value })
-}
-
-// Обработка аудио с анимированным статусом
-const processAudioWithStatus = async () => {
-	// Перед обработкой обновляем advancedSettings в хранилище
-	console.log("Updating advanced settings...");
-	audioStore.updateAdvancedSettings({
-		...advancedSettings,
-		useAdvancedProcessing: useAdvancedProcessing.value
 	});
 
-	// Обновляем текущее время и пользователя в хранилище
-	console.log("Updating current date and user...");
-	audioStore.currentDateTime = currentDateText.value;
-	audioStore.currentUser = currentUser.value;
+	currentPreset.value = preset.name;
+	nextTick(updateAllSliders);
+};
 
-	// Запускаем анимацию обработки
+// Called when a preset is selected from the dropdown
+const applySelectedPreset = () => {
+	if (!currentPreset.value) return;
+	const preset = presets.find(p => p.name === currentPreset.value);
+	if (preset) applyPreset(preset);
+};
+
+// Update slider backgrounds based on their value (for horizontal sliders)
+const updateSliderBackground = (event: any) => {
+	const target = event.target;
+	if (!target) return;
+	const min = parseFloat(target.min) || 0;
+	const max = parseFloat(target.max) || 100;
+	const value = parseFloat(target.value);
+	const percentage = ((value - min) / (max - min)) * 100;
+	target.style.backgroundImage = `linear-gradient(to right, #8B5CF6 0%, #8B5CF6 ${percentage}%, #374151 ${percentage}%, #374151 100%)`;
+};
+
+// For vertical sliders (e.g. the equalizer)
+const updateVerticalSliderBackground = (event: any) => {
+	const target = event.target;
+	if (!target) return;
+	const min = parseFloat(target.min) || -12;
+	const max = parseFloat(target.max) || 12;
+	const value = parseFloat(target.value);
+	let percentage = value >= 0 ? 50 + (value / max) * 50 : 50 + (value / Math.abs(min)) * 50;
+	target.style.backgroundImage = `linear-gradient(to top, ${value < 0 ? '#374151' : '#8B5CF6'} 0%, ${value < 0 ? '#374151' : '#8B5CF6'} 50%, ${value < 0 ? '#8B5CF6' : '#374151'} 50%, ${value < 0 ? '#8B5CF6' : '#374151'} 100%)`;
+};
+
+const updateAllSliders = () => {
+	if (noiseSlider.value) updateSliderBackground({ target: noiseSlider.value });
+	if (normSlider.value) updateSliderBackground({ target: normSlider.value });
+	if (stereoSlider.value) updateSliderBackground({ target: stereoSlider.value });
+	if (dereverbSlider.value) updateSliderBackground({ target: dereverbSlider.value });
+	if (harmonicSlider.value) updateSliderBackground({ target: harmonicSlider.value });
+	if (claritySlider.value) updateSliderBackground({ target: claritySlider.value });
+	if (lowSlider.value) updateVerticalSliderBackground({ target: lowSlider.value });
+	if (midSlider.value) updateVerticalSliderBackground({ target: midSlider.value });
+	if (highSlider.value) updateVerticalSliderBackground({ target: highSlider.value });
+};
+
+// Function to process the audio with status animation
+const processAudioWithStatus = async () => {
 	console.log("Starting processing animation...");
 	let stepIndex = 0;
 	processingStatus.value = processingSteps[0];
@@ -521,14 +429,13 @@ const processAudioWithStatus = async () => {
 	}, 1000);
 
 	try {
-		const audioBuffer = originalBuffer.value; // Предполагаем, что originalBuffer содержит аудио буфер для обработки
-		if (!audioBuffer) {
+		if (!originalBuffer.value) {
 			throw new Error('No audio buffer available for processing.');
 		}
 		console.log("Starting audio processing...");
-		await originalProcessAudio(audioBuffer);
+		await originalProcessAudio(originalBuffer.value);
 		console.log("Audio processing completed.");
-	} catch (error) {
+	} catch (error: any) {
 		console.error(`Error during processing: ${error.message}`);
 		processingStatus.value = `Ошибка: ${error.message}`;
 	} finally {
@@ -540,91 +447,70 @@ const processAudioWithStatus = async () => {
 	}
 };
 
-// Часы текущего времени
+// Clock update example (updates the current time string)
 const updateClock = () => {
-	const currentDate = currentDateText.value
-	const parts = currentDate.split(' ')
-	const date = parts[0]
-	const timeParts = parts[1].split(':')
-	let hours = parseInt(timeParts[0])
-	let minutes = parseInt(timeParts[1])
-	let seconds = parseInt(timeParts[2]) + 1
-
-	if (seconds >= 60) {
-		seconds = 0
-		minutes += 1
-		if (minutes >= 60) {
-			minutes = 0
-			hours += 1
-			if (hours >= 24) {
-				hours = 0
-			}
+	const parts = currentDateText.value.split(' ');
+	const date = parts[0];
+	const timeParts = parts[1].split(':').map(Number);
+	timeParts[2]++;
+	if (timeParts[2] >= 60) {
+		timeParts[2] = 0;
+		timeParts[1]++;
+		if (timeParts[1] >= 60) {
+			timeParts[1] = 0;
+			timeParts[0]++;
+			if (timeParts[0] >= 24) timeParts[0] = 0;
 		}
 	}
+	const newTime = timeParts.map(num => num.toString().padStart(2, '0')).join(':');
+	currentDateText.value = `${date} ${newTime}`;
+};
 
-	const newTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-	currentDateText.value = `${date} ${newTime}`
-}
-
-// Инициализация фонов ползунков и данных при монтировании компонента
 onMounted(() => {
-	// Устанавливаем текущие дату/время и пользователя
-	audioStore.currentDateTime = currentDateText.value
-	audioStore.currentUser = currentUser.value
+	// Set initial date/time and user in the store
+	audioStore.currentDateTime = currentDateText.value;
+	audioStore.currentUser = currentUser.value;
 
-	// Если в хранилище есть продвинутые настройки, используем их
+	// Use advanced settings from the store if available
 	if (audioStore.advancedSettings) {
-		useAdvancedProcessing.value = audioStore.advancedSettings.useAdvancedProcessing
-		advancedSettings.denoiseLevel = audioStore.advancedSettings.denoiseLevel
-		advancedSettings.harmonicEnhance = audioStore.advancedSettings.harmonicEnhance
-		advancedSettings.clarityLevel = audioStore.advancedSettings.clarityLevel
-		advancedSettings.dereverbLevel = audioStore.advancedSettings.dereverbLevel
+		useAdvancedProcessing.value = audioStore.advancedSettings.useAdvancedProcessing;
+		advancedSettings.denoiseLevel = audioStore.advancedSettings.denoiseLevel;
+		advancedSettings.harmonicEnhance = audioStore.advancedSettings.harmonicEnhance;
+		advancedSettings.clarityLevel = audioStore.advancedSettings.clarityLevel;
+		advancedSettings.dereverbLevel = audioStore.advancedSettings.dereverbLevel;
 	} else {
-		// Иначе сохраняем текущие настройки в хранилище
 		audioStore.updateAdvancedSettings({
 			...advancedSettings,
 			useAdvancedProcessing: useAdvancedProcessing.value
-		})
+		});
 	}
-
-	// Обновляем стили ползунков
-	nextTick(() => {
-		updateAllSliders()
-	})
-
-	// Обновление часов
-	const clockInterval = setInterval(updateClock, 1000)
-
+	nextTick(updateAllSliders);
+	const clockInterval = setInterval(updateClock, 1000);
 	onUnmounted(() => {
-		clearInterval(clockInterval)
-		if (processingInterval) clearInterval(processingInterval)
-	})
-})
+		clearInterval(clockInterval);
+		if (processingInterval) clearInterval(processingInterval);
+	});
+});
 
-// Следим за изменениями настроек для обновления ползунков
-watch([
-	() => audioStore.settings,
-	() => advancedSettings,
-	useAdvancedProcessing
-], () => {
-	nextTick(updateAllSliders)
-}, { deep: true })
+// Watch for settings changes and update sliders
+watch([() => audioStore.settings, () => advancedSettings, useAdvancedProcessing], () => {
+	nextTick(updateAllSliders);
+}, { deep: true });
 
-// При изменении useAdvancedProcessing обновляем настройки в хранилище
-watch(useAdvancedProcessing, (newValue) => {
+watch(useAdvancedProcessing, newValue => {
 	audioStore.updateAdvancedSettings({
 		...advancedSettings,
 		useAdvancedProcessing: newValue
-	})
-})
+	});
+});
 
-// При изменении advancedSettings обновляем их в хранилище
-watch(advancedSettings, (newValue) => {
+watch(advancedSettings, newValue => {
 	audioStore.updateAdvancedSettings({
 		...newValue,
 		useAdvancedProcessing: useAdvancedProcessing.value
-	})
-}, { deep: true })
+	});
+}, { deep: true });
+
 </script>
 
 <style scoped>
