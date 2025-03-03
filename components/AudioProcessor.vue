@@ -284,7 +284,7 @@ import { useAudioProcessor } from '~/composables/useAudioProcessor'
 import { ref, reactive, onMounted, computed, watch, onUnmounted, nextTick } from 'vue'
 
 const audioStore = useAudioStore()
-const { processAudio: originalProcessAudio } = useAudioProcessor()
+const { originalProcessAudio, originalBuffer, processorState, processingProgress, errorMessage } = useAudioProcessor();
 const currentDateText = ref('2025-03-01 19:25:48')
 const currentUser = ref('ramazanov-ma')
 
@@ -500,33 +500,45 @@ const updateAllSliders = () => {
 // Обработка аудио с анимированным статусом
 const processAudioWithStatus = async () => {
 	// Перед обработкой обновляем advancedSettings в хранилище
+	console.log("Updating advanced settings...");
 	audioStore.updateAdvancedSettings({
 		...advancedSettings,
 		useAdvancedProcessing: useAdvancedProcessing.value
-	})
+	});
 
 	// Обновляем текущее время и пользователя в хранилище
-	audioStore.currentDateTime = currentDateText.value
-	audioStore.currentUser = currentUser.value
+	console.log("Updating current date and user...");
+	audioStore.currentDateTime = currentDateText.value;
+	audioStore.currentUser = currentUser.value;
 
 	// Запускаем анимацию обработки
-	let stepIndex = 0
-	processingStatus.value = processingSteps[0]
+	console.log("Starting processing animation...");
+	let stepIndex = 0;
+	processingStatus.value = processingSteps[0];
 	processingInterval = setInterval(() => {
-		stepIndex = (stepIndex + 1) % processingSteps.length
-		processingStatus.value = processingSteps[stepIndex]
-	}, 1000)
+		stepIndex = (stepIndex + 1) % processingSteps.length;
+		processingStatus.value = processingSteps[stepIndex];
+	}, 1000);
 
 	try {
-		await originalProcessAudio()
+		const audioBuffer = originalBuffer.value; // Предполагаем, что originalBuffer содержит аудио буфер для обработки
+		if (!audioBuffer) {
+			throw new Error('No audio buffer available for processing.');
+		}
+		console.log("Starting audio processing...");
+		await originalProcessAudio(audioBuffer);
+		console.log("Audio processing completed.");
+	} catch (error) {
+		console.error(`Error during processing: ${error.message}`);
+		processingStatus.value = `Ошибка: ${error.message}`;
 	} finally {
 		if (processingInterval) {
-			clearInterval(processingInterval)
-			processingInterval = null
+			clearInterval(processingInterval);
+			processingInterval = null;
 		}
-		processingStatus.value = 'Обработка...'
+		processingStatus.value = 'Обработка завершена';
 	}
-}
+};
 
 // Часы текущего времени
 const updateClock = () => {
